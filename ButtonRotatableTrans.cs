@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ButtonRotatable : MonoBehaviour
+public class ButtonRotatableTrans : MonoBehaviour
 {
     float deltaRotation = 0.5f;
     float deltamove = 0.005f;
