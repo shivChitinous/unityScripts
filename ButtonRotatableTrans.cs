@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class ButtonRotatableTrans : MonoBehaviour
 {
-    float deltaRotation = 0.5f;
+    float deltaRotation = 0.6f;
     float deltamove = 0.005f;
 
     public float Rotation
@@ -32,7 +32,7 @@ public class ButtonRotatableTrans : MonoBehaviour
 
     public void moveForward(float sensitivity = 1.0f)
     {
-        transform.Translate(deltamove * sensitivity * Vector3.forward);
+        transform.Translate(deltamove * sensitivity * new Vector3(1,0,0));
     }
 
     // Update is called once per frame.
