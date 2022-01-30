@@ -12,7 +12,7 @@ public class Populate : MonoBehaviour
     {
         
         
-        string[] colors = {"#000000" }; // just black
+        string[] colors = { "#555555" }; // just black
         if (!AssetDatabase.IsValidFolder("Assets/Materials"))
         {
             AssetDatabase.CreateFolder("Assets", "Materials");
@@ -29,11 +29,12 @@ public class Populate : MonoBehaviour
         }
 
         const float FieldSizeHalf = 20;
-        const int NumObjsPerSide = 60;
+        const int NumObjsPerSide = 40;
         const int jitterfactor = 3; //1/x is the fraction of the grid size in which to jitter
-        const int anglerange = 90;
-        const float level = 0.8f;
-        const float leafscale = 0.05f;
+        const int anglerange = 45;
+        const float level = 0.3f;
+        const float vleafscale = 0.09f;
+        const float hleafscale = 0.02f;
 
         const float X0 = -FieldSizeHalf;
         const float X1 = FieldSizeHalf;
@@ -58,12 +59,12 @@ public class Populate : MonoBehaviour
                 PrimitiveType type;
 
                 type = PrimitiveType.Plane;
-                scaleX = leafscale;
-                scaleY = 0f;
-                scaleZ = leafscale;
-                rotX = Random.Range(-anglerange, anglerange);
-                rotY = Random.Range(-anglerange, anglerange);
-                rotZ = Random.Range(-anglerange, anglerange);
+                scaleX = hleafscale;
+                scaleY = 1f;
+                scaleZ = vleafscale;
+                rotX = Random.Range(90-anglerange, 90+anglerange);
+                rotY = Random.Range(-anglerange*4, anglerange*4);
+                rotZ = Random.Range(90-anglerange, 90+anglerange);
                 //name += "_leaf";
 
                 Vector3 pos = new Vector3(x + jitterX, level, z + jitterZ);
@@ -77,7 +78,7 @@ public class Populate : MonoBehaviour
                     obj.name = name;
 
                     MeshCollider objcol = obj.GetComponent<MeshCollider>();
-                    objcol.enabled = false;
+                    //objcol.enabled = false;
 
                     MeshRenderer mr = obj.GetComponent<MeshRenderer>();
                     int i = Random.Range(0, colors.Length);
