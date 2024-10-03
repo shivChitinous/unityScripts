@@ -25,9 +25,16 @@ public class talk2NiDaqMx : MonoBehaviour
         };
 
         // Create parameters that are the default values except the specified values.
-        _outputParams = new Janelia.NiDaqMx.OutputParams()
+        _outputParams1 = new Janelia.NiDaqMx.OutputParams()
         {
-            ChannelNames = new string[] { "ao0" },
+            ChannelNames = new string[] { "ao0"},
+            VoltageMin = -5,
+            VoltageMax = 5
+        };
+
+        _outputParams2 = new Janelia.NiDaqMx.OutputParams()
+        {
+            ChannelNames = new string[] { "ao1"},
             VoltageMin = -5,
             VoltageMax = 5
         };
@@ -44,7 +51,14 @@ public class talk2NiDaqMx : MonoBehaviour
             return;
         }
 
-        if (!Janelia.NiDaqMx.CreateOutputs(_outputParams))
+        if (!Janelia.NiDaqMx.CreateOutputs(_outputParams1))
+        {
+            Debug.Log("Creating output failed");
+            Debug.Log(Janelia.NiDaqMx.GetLatestError());
+            return;
+        }
+
+        if (!Janelia.NiDaqMx.CreateOutputs(_outputParams2))
         {
             Debug.Log("Creating output failed");
             Debug.Log(Janelia.NiDaqMx.GetLatestError());
@@ -58,9 +72,10 @@ public class talk2NiDaqMx : MonoBehaviour
         int numWritten = 0;
 
         int expectedNumWritten = 1;
-        double writeValue = _outputParams.VoltageMax;
+        double writeValue1 = _outputParams1.VoltageMax;
+    
         //writeValue = 0.1 * writeValue;
-        if (!Janelia.NiDaqMx.WriteToOutputs(_outputParams, writeValue, ref numWritten))
+        if (!Janelia.NiDaqMx.WriteToOutputs(_outputParams1, writeValue1, ref numWritten))
 
         {
             Debug.Log("Frame " + Time.frameCount + ": write to output failed");
@@ -72,8 +87,9 @@ public class talk2NiDaqMx : MonoBehaviour
         }
         else if (showEachWrite)
         {
-            Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue);
+            Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue1);
         }
+
 
     }
 
@@ -119,9 +135,10 @@ public class talk2NiDaqMx : MonoBehaviour
             int numWritten = 0;
 
             int expectedNumWritten = 1;
-            double writeValue = (_iWrite % 2 == 0) ? _outputParams.VoltageMax : _outputParams.VoltageMin;
+            double writeValue1 = (_iWrite % 2 == 0) ? _outputParams1.VoltageMax : _outputParams1.VoltageMin;
+            double writeValue2 = (_iWrite % 2 == 0) ? _outputParams2.VoltageMax : _outputParams2.VoltageMin;
             //writeValue = 0.1 * writeValue;
-            if (!Janelia.NiDaqMx.WriteToOutputs(_outputParams, writeValue, ref numWritten))
+            if (!Janelia.NiDaqMx.WriteToOutputs(_outputParams1, writeValue1, ref numWritten))
 
             {
                 Debug.Log("Frame " + Time.frameCount + ": write to output failed");
@@ -133,7 +150,8 @@ public class talk2NiDaqMx : MonoBehaviour
             }
             else if (showEachWrite)
             {
-                Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue);
+                Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue1);
+                Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue2);
             }
             _iWrite++;
         }
@@ -141,13 +159,32 @@ public class talk2NiDaqMx : MonoBehaviour
     }
 
     private void OnDestroy()
-    {
+    {   
+        int expectedNumWritten = 1;
+        int numWritten = 1;
+        double writeValue2 = _outputParams2.VoltageMax;
+        if (!Janelia.NiDaqMx.WriteToOutputs(_outputParams2, writeValue2, ref numWritten))
+
+        {
+            Debug.Log("Frame " + Time.frameCount + ": write to output failed");
+            Debug.Log(Janelia.NiDaqMx.GetLatestError());
+        }
+        if (numWritten != expectedNumWritten)
+        {
+            Debug.Log("Frame " + Time.frameCount + ": unexpectedly, wrote " + numWritten + " values");
+        }
+        else if (showEachWrite)
+        {
+            Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue2);
+        }
+
         Janelia.NiDaqMx.OnDestroy();
     }
 
     private Janelia.NiDaqMx.InputParams _inputParams;
     double[] _readData;
 
-    private Janelia.NiDaqMx.OutputParams _outputParams;
+    private Janelia.NiDaqMx.OutputParams _outputParams1;
+    private Janelia.NiDaqMx.OutputParams _outputParams2;
     int _iWrite = 0;
 }
