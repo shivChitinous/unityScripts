@@ -3,17 +3,25 @@ using UnityEngine;
 
 public class AnimateCylinderTexture : MonoBehaviour
 {
-    public float vRotDeg_per_sec = 60.0f;
+    public float[] vRotDeg_per_sec;
+
+    public int[] sweepRepeatVec;
+
     public float numElevationSteps = 10.0f;
-    public int delaySeconds = 10;
+
+    public float delaySeconds = 10;
     public float offsetTex = -90.0f;
 
-    public int repeats = 3;
+    public float offsetEl= 0.1f;
 
+    private int repeats = 1; // use repeating velocities to ensure repeats
     private Material cylinderMaterial;
-    private float elevation = 0;
+    private float elevation;
     private int currentStep = 1;
     private float rotDir = 1.0f;
+    private int vel = 0;
+    private float waitTime = 0;
+    
 
     //set up logging
     [Serializable]
@@ -30,14 +38,18 @@ public class AnimateCylinderTexture : MonoBehaviour
     void Start()
     {
         cylinderMaterial = Resources.Load(Janelia.CylinderBackgroundResources.MaterialName, typeof(Material)) as Material;
+        //Resources.Load(Janelia.CylinderBackgroundResources.MaterialName, typeof(Material)) as Material
+
         if (cylinderMaterial == null)
         {
             Debug.LogError("Could not load material'" + Janelia.CylinderBackgroundResources.MaterialName + "'");
         }
 
         //reset texture based on offset
+        elevation = offsetEl;
         float x = offsetTex / 360.0f;
         float y = elevation;
+
         Vector2 offset = new Vector2(x, y);
 
         cylinderMaterial.SetTextureOffset("_MainTex", offset);
@@ -50,23 +62,39 @@ public class AnimateCylinderTexture : MonoBehaviour
 
     void Update()
     {
-        if (cylinderMaterial & Time.time >= delaySeconds)
+        //check if a velocity has been completed
+        if (currentStep > repeats * 2 * sweepRepeatVec[vel] * numElevationSteps)
         {
-            float dTime = Time.time - delaySeconds;
+            vel+=1;
+            currentStep = 1;
+            elevation = offsetEl;
+            if (vel <= vRotDeg_per_sec.Length)
+            {
+                waitTime = Time.time;
+            }
+        }
 
-            float x = offsetTex/360.0f + dTime * rotDir * (vRotDeg_per_sec / 360.0f) % 1;
+        if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
+        {
+
+            float dTime = Time.time - (waitTime+delaySeconds);
+            float x = offsetTex/360.0f + dTime * rotDir * (vRotDeg_per_sec[vel] / 360.0f) % 1;
 
             //check if a round has been completed
-            if (dTime * (vRotDeg_per_sec / 360.0f ) > currentStep)
+            if (dTime * (vRotDeg_per_sec[vel] / 360.0f ) > currentStep)
             {
-                if (currentStep % 2 == 1) // finished an uneven round --> first of two repeats
+                if (currentStep % (2*sweepRepeatVec[vel]) == 0) // we finished the nth repeat, change elevation and reset direction
                 {
-                    rotDir = -1.0f; // now change direction
-                }
-                else // we finished the second repeat, change elevation and reset direction
-                {
-                    elevation += 1 / numElevationSteps;
+                    elevation += (1-offsetEl) / numElevationSteps;
                     rotDir = 1.0f;
+                }
+                else if (currentStep % 2 == 0) // finished an even round --> second of two repeats
+                {
+                    rotDir = 1.0f; // now change direction to +ve
+                }
+                else // finished an uneven round --> first of two repeats
+                {
+                    rotDir = -1.0f; // now change direction to -ve
                 }
                 currentStep += 1;
 
@@ -76,8 +104,9 @@ public class AnimateCylinderTexture : MonoBehaviour
             Vector2 offset = new Vector2(x, y);
 
             //stop if done
-            if ( currentStep <= repeats * 2 * numElevationSteps)
+            if (currentStep*vel <= (repeats * 2 * numElevationSteps * sweepRepeatVec[sweepRepeatVec.Length-1] * vRotDeg_per_sec.Length))
             {
+
                 cylinderMaterial.SetTextureOffset("_MainTex", offset);
 
                 //log values
@@ -87,5 +116,7 @@ public class AnimateCylinderTexture : MonoBehaviour
             }
 
         }
+
     }
+
 }
