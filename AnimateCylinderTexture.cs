@@ -36,7 +36,7 @@ public class AnimateCylinderTexture : MonoBehaviour
 
 
     void Start()
-    {
+    {   /*
         cylinderMaterial = Resources.Load(Janelia.CylinderBackgroundResources.MaterialName, typeof(Material)) as Material;
         //Resources.Load(Janelia.CylinderBackgroundResources.MaterialName, typeof(Material)) as Material
 
@@ -44,6 +44,7 @@ public class AnimateCylinderTexture : MonoBehaviour
         {
             Debug.LogError("Could not load material'" + Janelia.CylinderBackgroundResources.MaterialName + "'");
         }
+        */ 
 
         //reset texture based on offset
         elevation = offsetEl;
@@ -52,12 +53,15 @@ public class AnimateCylinderTexture : MonoBehaviour
 
         Vector2 offset = new Vector2(x, y);
 
-        cylinderMaterial.SetTextureOffset("_MainTex", offset);
+        //cylinderMaterial.SetTextureOffset("_MainTex", offset);
 
         //log values
         _currentLogEntry.xpos = x;
         _currentLogEntry.ypos = y;
         Janelia.Logger.Log(_currentLogEntry);
+
+        int which = 0;
+        Janelia.BackgroundUtilities.SetCylinderTextureOffset(offset, which);
     }
 
     void Update()
@@ -106,8 +110,11 @@ public class AnimateCylinderTexture : MonoBehaviour
             //stop if done
             if (currentStep*vel <= (repeats * 2 * numElevationSteps * sweepRepeatVec[sweepRepeatVec.Length-1] * vRotDeg_per_sec.Length))
             {
+                
+                int which = 0;
+                Janelia.BackgroundUtilities.SetCylinderTextureOffset(offset, which);
 
-                cylinderMaterial.SetTextureOffset("_MainTex", offset);
+                //cylinderMaterial.SetTextureOffset("_MainTex", offset);
 
                 //log values
                 _currentLogEntry.xpos = x;
