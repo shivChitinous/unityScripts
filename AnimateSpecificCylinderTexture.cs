@@ -15,7 +15,7 @@ public class AnimateSpecificCylinderTexture : MonoBehaviour
     public float offsetEl= 0.1f;
 
     private int repeats = 1; // use repeating velocities to ensure repeats
-    private Material cylinderMaterial;
+    public Material cylinderMaterial;
     private float elevation;
     private int currentStep = 1;
     private float rotDir = 1.0f;
@@ -63,17 +63,19 @@ public class AnimateSpecificCylinderTexture : MonoBehaviour
             Debug.LogError("Could not load texture from '" + texturePath + "'");
         }
 
-        //reset texture based on offset
+       //reset texture based on offset
+        elevation = offsetEl;
         float x = offsetTex / 360.0f;
         float y = elevation;
-        Vector2 offset = new Vector2(x, y);
 
-        cylinderMaterial.SetTextureOffset("_MainTex", offset);
+        Vector2 offset = new Vector2(x, y);
 
         //log values
         _currentLogEntry.xpos = x;
         _currentLogEntry.ypos = y;
         Janelia.Logger.Log(_currentLogEntry);
+
+        cylinderMaterial.SetTextureOffset("_MainTex", offset);
     }
 
     void Update()
