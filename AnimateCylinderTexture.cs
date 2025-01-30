@@ -78,7 +78,7 @@ public class AnimateCylinderTexture : MonoBehaviour
             }
         }
 
-        if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
+        if (Time.time >= (waitTime+delaySeconds))
         {
 
             float dTime = Time.time - (waitTime+delaySeconds);
