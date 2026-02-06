@@ -69,15 +69,13 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
             {
                 for (int i = 0; i < numReadPerChannel; i++)
                 {
-                    // Channel 2 (ai1)
-                    int j = Janelia.NiDaqMx.IndexInReadBuffer(0, numReadPerChannel, i);
-                    _currentLogEntry.vm_mv = _readData[j] * 10;
-                }
-                for (int i = 0; i < numReadPerChannel; i++)
-                {
-                    // Channel 3 (ai2)
+                    // Channel 0 (ai1)
                     int k = Janelia.NiDaqMx.IndexInReadBuffer(0, numReadPerChannel, i);
-                    _currentLogEntry.command_pa = _readData[k];
+                    // Channel 1 (ai2)
+                    int j = Janelia.NiDaqMx.IndexInReadBuffer(1, numReadPerChannel, i);
+
+                    _currentLogEntry.vm_mv = _readData[k];
+                    _currentLogEntry.command_pa = _readData[j];
                     Janelia.Logger.Log(_currentLogEntry);
                 }
             }
