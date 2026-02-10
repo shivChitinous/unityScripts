@@ -10,6 +10,7 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
         public double VoltageWritten;
         public double vm_mv;
         public double command_pa;
+        public int sampleIndx;
     };
     private Logs _currentLogEntry = new Logs();
     private void Start()
@@ -76,6 +77,7 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
 
                     _currentLogEntry.vm_mv = _readData[k];
                     _currentLogEntry.command_pa = _readData[j];
+                    _currentLogEntry.sampleIndx = i;
                     Janelia.Logger.Log(_currentLogEntry);
                 }
             }
