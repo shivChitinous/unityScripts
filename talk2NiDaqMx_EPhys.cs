@@ -133,7 +133,6 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
         else
         {
             _currentLogEntry.VoltageWritten = _writeData[0];
-            Janelia.Logger.Log(_currentLogEntry);
             if (showEachWrite)
             {
                 Debug.Log($"Frame {Time.frameCount}: wrote {numWritten} value(s): {_writeData}");
