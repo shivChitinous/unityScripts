@@ -57,35 +57,6 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
             Debug.LogWarning("killSwitch caught!");
             return;
         }
-        // Reading
-        int numReadPerChannel = 0;
-        if (!Janelia.NiDaqMx.ReadFromInputs(_inputParams, ref _readData, ref numReadPerChannel))
-        {
-            Debug.LogError($"Frame {Time.frameCount}: read from input failed");
-            Debug.LogError(Janelia.NiDaqMx.GetLatestError());
-        }
-        else
-        {
-            if (numReadPerChannel > 0)
-            {
-                for (int i = 0; i < numReadPerChannel; i++)
-                {
-                    // Channel 0 (ai1)
-                    int k = Janelia.NiDaqMx.IndexInReadBuffer(0, numReadPerChannel, i);
-                    // Channel 1 (ai2)
-                    int j = Janelia.NiDaqMx.IndexInReadBuffer(1, numReadPerChannel, i);
-
-                    _currentLogEntry.vm_mv = _readData[k];
-                    _currentLogEntry.command_pa = _readData[j];
-                    _currentLogEntry.sampleIndx = i;
-                    Janelia.Logger.Log(_currentLogEntry);
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"Frame {Time.frameCount}: unexpectedly, read {numReadPerChannel} values");
-            }
-        }
         // Writing
         int numWritten = 0;
         double writeValueModulator = (_outputParams.VoltageMax - _outputParams.VoltageMin) / 360;
@@ -136,6 +107,35 @@ public class talk2NiDaqMxFlyRotation : MonoBehaviour
             if (showEachWrite)
             {
                 Debug.Log($"Frame {Time.frameCount}: wrote {numWritten} value(s): {_writeData}");
+            }
+        }
+        // Reading
+        int numReadPerChannel = 0;
+        if (!Janelia.NiDaqMx.ReadFromInputs(_inputParams, ref _readData, ref numReadPerChannel))
+        {
+            Debug.LogError($"Frame {Time.frameCount}: read from input failed");
+            Debug.LogError(Janelia.NiDaqMx.GetLatestError());
+        }
+        else
+        {
+            if (numReadPerChannel > 0)
+            {
+                for (int i = 0; i < numReadPerChannel; i++)
+                {
+                    // Channel 0 (ai1)
+                    int k = Janelia.NiDaqMx.IndexInReadBuffer(0, numReadPerChannel, i);
+                    // Channel 1 (ai2)
+                    int j = Janelia.NiDaqMx.IndexInReadBuffer(1, numReadPerChannel, i);
+
+                    _currentLogEntry.vm_mv = _readData[k];
+                    _currentLogEntry.command_pa = _readData[j];
+                    _currentLogEntry.sampleIndx = i;
+                    Janelia.Logger.Log(_currentLogEntry);
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"Frame {Time.frameCount}: unexpectedly, read {numReadPerChannel} values");
             }
         }
     }
