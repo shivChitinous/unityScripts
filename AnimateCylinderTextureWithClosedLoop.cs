@@ -27,6 +27,8 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
     private bool inClosedLoop = false;
     private float closedLoopStartTime = 0;
 
+    public float cylinderDeg = 360.0f;
+
     private RotationConstraint _rotationConstraint;
 
     //set up logging
@@ -90,13 +92,19 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             return;
         }
 
+        // All velocities done
+        if (vel >= vRotDeg_per_sec.Length)
+        {
+            return;
+        }
+
         //check if a velocity has been completed
         if (currentStep > repeats * 2 * sweepRepeatVec[vel] * numElevationSteps)
         {
             vel+=1;
             currentStep = 1;
             elevation = offsetEl;
-            if (vel <= vRotDeg_per_sec.Length)
+            if (vel < vRotDeg_per_sec.Length)
             {
                 // Enter closed-loop mode: freeze texture, relax rotation constraint
                 inClosedLoop = true;
@@ -123,7 +131,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
         {
 
             float dTime = Time.time - (waitTime+delaySeconds);
-            float x = offsetTex/360.0f + dTime * rotDir * (vRotDeg_per_sec[vel] / 360.0f) % 1;
+            float x = offsetTex/cylinderDeg + dTime * rotDir * (vRotDeg_per_sec[vel] / cylinderDeg) % 1;
 
             //check if a round has been completed
             if (dTime * (vRotDeg_per_sec[vel] / 360.0f ) > currentStep)
