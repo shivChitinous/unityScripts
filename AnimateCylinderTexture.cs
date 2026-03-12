@@ -80,7 +80,9 @@ public class AnimateCylinderTexture : MonoBehaviour
             vel+=1;
             currentStep = 1;
             elevation = offsetEl;
+            rotDir = 1.0f;
             totalSweepDelayTime = 0;
+            inSweepDelay = false;
             if (vel < vRotDeg_per_sec.Length)
             {
                 waitTime = Time.time;
