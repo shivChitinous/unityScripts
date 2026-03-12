@@ -57,6 +57,11 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
         {
             Debug.LogError("No RotationConstraint found in scene");
         }
+        else
+        {
+            Debug.Log("Found RotationConstraint on: " + _rotationConstraint.gameObject.name
+                + ", constraintActive=" + _rotationConstraint.constraintActive);
+        }
 
         //reset texture based on offset
         elevation = offsetEl;
@@ -86,6 +91,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 if (_rotationConstraint != null)
                 {
                     _rotationConstraint.constraintActive = true;
+                    Debug.Log("Closed loop OFF: constraintActive set to true");
                 }
                 waitTime = Time.time;
             }
@@ -112,6 +118,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 if (_rotationConstraint != null)
                 {
                     _rotationConstraint.constraintActive = false;
+                    Debug.Log("Closed loop ON: constraintActive set to false");
                 }
 
                 // Reset texture to original position
