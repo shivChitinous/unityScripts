@@ -10,6 +10,7 @@ public class AnimateCylinderTexture : MonoBehaviour
     public float numElevationSteps = 10.0f;
 
     public float delaySeconds = 10;
+    public float sweepDelaySeconds = 0;
     public float offsetTex = -90.0f;
 
     public float offsetEl= 0.1f;
@@ -21,6 +22,8 @@ public class AnimateCylinderTexture : MonoBehaviour
     private float rotDir = 1.0f;
     private int vel = 0;
     private float waitTime = 0;
+    private float sweepWaitTime = 0;
+    private bool inSweepDelay = false;
 
     public float cylinderDeg = 360.0f;
     
@@ -83,6 +86,17 @@ public class AnimateCylinderTexture : MonoBehaviour
             return;
         }
 
+        // Wait out sweep delay between individual sweeps
+        if (inSweepDelay)
+        {
+            if (Time.time >= sweepWaitTime + sweepDelaySeconds)
+            {
+                inSweepDelay = false;
+                waitTime = Time.time - delaySeconds; // resume immediately without velocity delay
+            }
+            return;
+        }
+
         if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
         {
 
@@ -106,6 +120,14 @@ public class AnimateCylinderTexture : MonoBehaviour
                     rotDir = -1.0f; // now change direction to -ve
                 }
                 currentStep += 1;
+
+                // Enter sweep delay before next sweep begins
+                if (sweepDelaySeconds > 0)
+                {
+                    inSweepDelay = true;
+                    sweepWaitTime = Time.time;
+                    return;
+                }
 
             }
 
