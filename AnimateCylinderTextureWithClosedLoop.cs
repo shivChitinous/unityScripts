@@ -84,6 +84,11 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
         // Handle closed-loop interleave period
         if (inClosedLoop)
         {
+            // Last velocity's closed loop lasts until the game ends
+            if (vel >= vRotDeg_per_sec.Length)
+            {
+                return;
+            }
             if (Time.time >= closedLoopStartTime + closedLoopDurationSeconds)
             {
                 // Closed-loop period is over, re-apply rotation constraint and resume sweeps
@@ -98,7 +103,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             return;
         }
 
-        // All velocities done
+        // All velocities done and not in closed loop (shouldn't reach here, but guard)
         if (vel >= vRotDeg_per_sec.Length)
         {
             return;
@@ -110,27 +115,25 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             vel+=1;
             currentStep = 1;
             elevation = offsetEl;
-            if (vel < vRotDeg_per_sec.Length)
+
+            // Enter closed-loop mode: freeze texture, relax rotation constraint
+            inClosedLoop = true;
+            closedLoopStartTime = Time.time;
+            if (_rotationConstraint != null)
             {
-                // Enter closed-loop mode: freeze texture, relax rotation constraint
-                inClosedLoop = true;
-                closedLoopStartTime = Time.time;
-                if (_rotationConstraint != null)
-                {
-                    _rotationConstraint.constraintActive = false;
-                    Debug.Log("Closed loop ON: constraintActive set to false");
-                }
-
-                // Reset texture to original position
-                float x = offsetTex / 360.0f;
-                float y = offsetEl;
-                cylinderMaterial.SetTextureOffset("_MainTex", new Vector2(x, y));
-
-                _currentLogEntry.xpos = x;
-                _currentLogEntry.ypos = y;
-                _currentLogEntry.isClosedLoop = true;
-                Janelia.Logger.Log(_currentLogEntry);
+                _rotationConstraint.constraintActive = false;
+                Debug.Log("Closed loop ON: constraintActive set to false, vel=" + vel);
             }
+
+            // Reset texture to original position
+            float x = offsetTex / 360.0f;
+            float y = offsetEl;
+            cylinderMaterial.SetTextureOffset("_MainTex", new Vector2(x, y));
+
+            _currentLogEntry.xpos = x;
+            _currentLogEntry.ypos = y;
+            _currentLogEntry.isClosedLoop = true;
+            Janelia.Logger.Log(_currentLogEntry);
             return;
         }
 
