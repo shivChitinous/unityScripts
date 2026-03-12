@@ -21,6 +21,8 @@ public class AnimateCylinderTexture : MonoBehaviour
     private float rotDir = 1.0f;
     private int vel = 0;
     private float waitTime = 0;
+
+    public float cylinderDeg = 360.0f;
     
 
     //set up logging
@@ -78,7 +80,7 @@ public class AnimateCylinderTexture : MonoBehaviour
         {
 
             float dTime = Time.time - (waitTime+delaySeconds);
-            float x = offsetTex/360.0f + dTime * rotDir * (vRotDeg_per_sec[vel] / 360.0f) % 1;
+            float x = offsetTex/cylinderDeg + dTime * rotDir * (vRotDeg_per_sec[vel] / cylinderDeg) % 1;
 
             //check if a round has been completed
             if (dTime * (vRotDeg_per_sec[vel] / 360.0f ) > currentStep)
