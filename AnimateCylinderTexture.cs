@@ -100,10 +100,10 @@ public class AnimateCylinderTexture : MonoBehaviour
             return;
         }
 
-        if (cylinderMaterial & Time.time >= waitTime)
+        if (cylinderMaterial & Time.time >= (waitTime+sweepDelaySeconds))
         {
 
-            float dTime = Time.time - waitTime - totalSweepDelayTime;
+            float dTime = Time.time - (waitTime+sweepDelaySeconds) - totalSweepDelayTime;
             float x = offsetTex/cylinderDeg + dTime * rotDir * (vRotDeg_per_sec[vel] / cylinderDeg) % 1;
 
             //check if a round has been completed
