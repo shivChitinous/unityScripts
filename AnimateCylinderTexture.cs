@@ -24,6 +24,7 @@ public class AnimateCylinderTexture : MonoBehaviour
     private float waitTime = 0;
     private float sweepWaitTime = 0;
     private bool inSweepDelay = false;
+    private float totalSweepDelayTime = 0;
 
     public float cylinderDeg = 360.0f;
     
@@ -79,6 +80,7 @@ public class AnimateCylinderTexture : MonoBehaviour
             vel+=1;
             currentStep = 1;
             elevation = offsetEl;
+            totalSweepDelayTime = 0;
             if (vel < vRotDeg_per_sec.Length)
             {
                 waitTime = Time.time;
@@ -92,7 +94,7 @@ public class AnimateCylinderTexture : MonoBehaviour
             if (Time.time >= sweepWaitTime + sweepDelaySeconds)
             {
                 inSweepDelay = false;
-                waitTime = Time.time - delaySeconds; // resume immediately without velocity delay
+                totalSweepDelayTime += Time.time - sweepWaitTime;
             }
             return;
         }
@@ -100,7 +102,7 @@ public class AnimateCylinderTexture : MonoBehaviour
         if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
         {
 
-            float dTime = Time.time - (waitTime+delaySeconds);
+            float dTime = Time.time - (waitTime+delaySeconds) - totalSweepDelayTime;
             float x = offsetTex/cylinderDeg + dTime * rotDir * (vRotDeg_per_sec[vel] / cylinderDeg) % 1;
 
             //check if a round has been completed
