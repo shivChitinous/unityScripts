@@ -12,7 +12,6 @@ public class talk2NiDaqMx : MonoBehaviour
     {
         public double tracePD = 0.0;
         public double imgFrameTrigger;
-        public double indexFrameTrigger;
     };
 
     private photoDiodeLogEntry _currentLogEntry = new photoDiodeLogEntry();
@@ -76,7 +75,6 @@ public class talk2NiDaqMx : MonoBehaviour
             Debug.Log("Frame " + Time.frameCount + ": wrote " + numWritten + " value(s): " + writeValue);
         }
 
-
     }
 
     private void Update()
@@ -102,11 +100,9 @@ public class talk2NiDaqMx : MonoBehaviour
 
                     //channel 2 (ai1)
                     int k = Janelia.NiDaqMx.IndexInReadBuffer(1, numReadPerChannel, i);
-                    _currentLogEntry.indexFrameTrigger = k;
                     _currentLogEntry.imgFrameTrigger = _readData[k];
 
                     Janelia.Logger.Log(_currentLogEntry);
-
                 }
             }
             else
