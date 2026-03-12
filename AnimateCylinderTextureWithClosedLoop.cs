@@ -1,7 +1,8 @@
 using System;
 using UnityEngine;
+using UnityEngine.Animations;
 
-public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
+public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
 {
     public float[] vRotDeg_per_sec;
 
@@ -17,7 +18,7 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
     public int closedLoopDurationSeconds = 10;
 
     private int repeats = 1; // use repeating velocities to ensure repeats
-    public Material cylinderMaterial;
+    private Material cylinderMaterial;
     private float elevation;
     private int currentStep = 1;
     private float rotDir = 1.0f;
@@ -26,8 +27,7 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
     private bool inClosedLoop = false;
     private float closedLoopStartTime = 0;
 
-    // Subject transform, found automatically via FicTracSubject
-    private Transform _subjectTransform;
+    private RotationConstraint _rotationConstraint;
 
     //set up logging
     [Serializable]
@@ -40,72 +40,35 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
 
     private textureLogEntry _currentLogEntry = new textureLogEntry();
 
+
     void Start()
     {
-        if (cylinderMaterial == null)
-        {
-            Resources.Load("UnlitTexture1", typeof(Material));
-        }
+        cylinderMaterial = Resources.Load(Janelia.CylinderBackgroundResources.MaterialName, typeof(Material)) as Material;
 
         if (cylinderMaterial == null)
         {
-            Debug.LogError("Could not load material specified material");
+            Debug.LogError("Could not load material'" + Janelia.CylinderBackgroundResources.MaterialName + "'");
         }
 
-        // Find the FicTracSubject in the scene to get the animal's transform
-        Janelia.FicTracSubject ficTracSubject = FindObjectOfType<Janelia.FicTracSubject>();
-        if (ficTracSubject != null)
+        _rotationConstraint = FindObjectOfType<RotationConstraint>();
+        if (_rotationConstraint == null)
         {
-            _subjectTransform = ficTracSubject.transform;
-        }
-        else
-        {
-            Debug.LogError("No FicTracSubject found in scene - needed for open-loop heading compensation");
+            Debug.LogError("No RotationConstraint found in scene");
         }
 
-        //get secondary texture and apply it to the specified material
-        string texturePath = Janelia.SessionParameters.GetStringParameter("leftTexture");
-        byte[] bytes = System.IO.File.ReadAllBytes(texturePath);
-        const int ToBeReplacedByLoadImage = 2;
-        const bool MipMaps = false;
-        Texture2D texture = new Texture2D(ToBeReplacedByLoadImage, ToBeReplacedByLoadImage, TextureFormat.RGBA32, MipMaps);
-        texture.filterMode = FilterMode.Bilinear;
-
-        if (texture.LoadImage(bytes))
-        {
-            cylinderMaterial.SetTexture("_MainTex", texture);
-        }
-        else
-        {
-            Debug.LogError("Could not load texture from '" + texturePath + "'");
-        }
-
-       //reset texture based on offset
+        //reset texture based on offset
         elevation = offsetEl;
         float x = offsetTex / 360.0f;
         float y = elevation;
 
         Vector2 offset = new Vector2(x, y);
 
+        cylinderMaterial.SetTextureOffset("_MainTex", offset);
+
         //log values
         _currentLogEntry.xpos = x;
         _currentLogEntry.ypos = y;
         _currentLogEntry.isClosedLoop = false;
-        Janelia.Logger.Log(_currentLogEntry);
-
-        cylinderMaterial.SetTextureOffset("_MainTex", offset);
-    }
-
-    private void ResetTextureToOrigin()
-    {
-        float x = offsetTex / 360.0f;
-        float y = offsetEl;
-        Vector2 offset = new Vector2(x, y);
-        cylinderMaterial.SetTextureOffset("_MainTex", offset);
-
-        _currentLogEntry.xpos = x;
-        _currentLogEntry.ypos = y;
-        _currentLogEntry.isClosedLoop = true;
         Janelia.Logger.Log(_currentLogEntry);
     }
 
@@ -116,12 +79,14 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
         {
             if (Time.time >= closedLoopStartTime + closedLoopDurationSeconds)
             {
-                // Closed-loop period is over, resume open-loop sweeps
+                // Closed-loop period is over, re-apply rotation constraint and resume sweeps
                 inClosedLoop = false;
+                if (_rotationConstraint != null)
+                {
+                    _rotationConstraint.constraintActive = true;
+                }
                 waitTime = Time.time;
             }
-            // During closed loop: texture stays at original offset,
-            // FicTrac drives subject rotation relative to the static texture
             return;
         }
 
@@ -133,26 +98,32 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
             elevation = offsetEl;
             if (vel <= vRotDeg_per_sec.Length)
             {
-                // Enter closed-loop mode: reset texture and wait
+                // Enter closed-loop mode: freeze texture, relax rotation constraint
                 inClosedLoop = true;
                 closedLoopStartTime = Time.time;
-                ResetTextureToOrigin();
+                if (_rotationConstraint != null)
+                {
+                    _rotationConstraint.constraintActive = false;
+                }
+
+                // Reset texture to original position
+                float x = offsetTex / 360.0f;
+                float y = offsetEl;
+                cylinderMaterial.SetTextureOffset("_MainTex", new Vector2(x, y));
+
+                _currentLogEntry.xpos = x;
+                _currentLogEntry.ypos = y;
+                _currentLogEntry.isClosedLoop = true;
+                Janelia.Logger.Log(_currentLogEntry);
             }
             return;
         }
 
-        if (Time.time >= (waitTime+delaySeconds))
+        if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
         {
 
             float dTime = Time.time - (waitTime+delaySeconds);
-
-            // Compensate for subject heading so the sweep is purely open-loop:
-            // the animal's rotation moves the camera inside the cylinder, which
-            // shifts the perceived texture position. Adding the subject's Y heading
-            // back into the texture offset cancels this out.
-            float headingCompensation = _subjectTransform != null ? _subjectTransform.eulerAngles.y / 360.0f : 0f;
-
-            float x = offsetTex/360.0f + headingCompensation + dTime * rotDir * (vRotDeg_per_sec[vel] / 360.0f) % 1;
+            float x = offsetTex/360.0f + dTime * rotDir * (vRotDeg_per_sec[vel] / 360.0f) % 1;
 
             //check if a round has been completed
             if (dTime * (vRotDeg_per_sec[vel] / 360.0f ) > currentStep)
@@ -193,4 +164,5 @@ public class AnimateSpecificCylinderTextureWithClosedLoop : MonoBehaviour
         }
 
     }
+
 }
