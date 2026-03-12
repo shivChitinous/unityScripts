@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experiment Time Calculator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            padding: 2rem;
+        }
+        .container { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+        .subtitle { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #444; }
+        label { display: block; font-weight: 500; margin-bottom: 0.25rem; font-size: 0.9rem; }
+        .hint { color: #888; font-size: 0.8rem; margin-bottom: 0.5rem; }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+        }
+        input:focus { outline: none; border-color: #4a90d9; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
+        .row { display: flex; gap: 1rem; }
+        .row > div { flex: 1; }
+        button {
+            background: #4a90d9;
+            color: #fff;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+        button:hover { background: #3a7bc8; }
+        .result { display: none; }
+        .result.visible { display: block; }
+        .total-time {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4a90d9;
+            margin-bottom: 0.5rem;
+        }
+        .breakdown { margin-top: 1rem; }
+        .breakdown table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .breakdown th, .breakdown td {
+            text-align: left;
+            padding: 0.4rem 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        .breakdown th { color: #666; font-weight: 600; }
+        .breakdown td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .summary-row td { font-weight: 600; border-top: 2px solid #ccc; }
+        .error { color: #d9534f; font-size: 0.85rem; margin-bottom: 0.5rem; display: none; }
+        .structure-note { background: #f0f6ff; padding: 0.75rem 1rem; border-radius: 4px; font-size: 0.8rem; color: #555; margin-bottom: 1rem; line-height: 1.5; }
+        .checkbox-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; cursor: pointer; }
+        .checkbox-row input[type="checkbox"] { width: auto; margin: 0; }
+        .checkbox-row .hint-inline { color: #888; font-size: 0.8rem; }
+        .radio-group { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+        .radio-group label { display: flex; align-items: center; gap: 0.35rem; font-weight: 400; font-size: 0.9rem; cursor: pointer; }
+        .radio-group input[type="radio"] { width: auto; margin: 0; }
+        .base-repeat-row { display: none; margin-bottom: 1rem; }
+        .base-repeat-row.visible { display: block; }
+        .closed-loop-fields { display: none; margin-bottom: 1rem; }
+        .closed-loop-fields.visible { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Experiment Time Calculator</h1>
+        <p class="subtitle">360° sweep stimulus — total duration estimator</p>
+
+        <div class="card">
+            <h2>Parameters</h2>
+            <div class="structure-note">
+                <strong>Trial structure:</strong> For each velocity, at each elevation, the object sweeps 360°
+                for <em>sweepRepeat</em> pairs of CW+CCW sweeps. A <em>sweepDelay</em> is added after every
+                individual sweep (including between directions, elevations, and velocities), plus once at the start.
+            </div>
+
+            <label for="speeds">Speeds (°/s)</label>
+            <div class="hint">Comma-separated, e.g. 10, 20, 40</div>
+            <input type="text" id="speeds" placeholder="10, 20, 40" value="10, 20, 40">
+
+            <label>Repeats mode (sweepRepeatVec)</label>
+            <div class="radio-group">
+                <label><input type="radio" name="repeatMode" value="equal" checked onchange="updateRepeatMode()"> Equal repeats</label>
+                <label><input type="radio" name="repeatMode" value="scaled" onchange="updateRepeatMode()"> Scale with speed</label>
+                <label><input type="radio" name="repeatMode" value="specified" onchange="updateRepeatMode()"> Specified</label>
+            </div>
+
+            <div class="base-repeat-row visible" id="baseRepeatRow">
+                <label for="baseRepeat">Base repeat count (r1)</label>
+                <input type="number" id="baseRepeat" min="1" value="3">
+            </div>
+
+            <div id="specifiedRepeatsRow" style="display:none; margin-bottom:1rem;">
+                <label for="repeats">Repeats per speed</label>
+                <div class="hint">Comma-separated (must match number of speeds)</div>
+                <input type="text" id="repeats" placeholder="3, 6, 12" value="3, 3, 3">
+            </div>
+
+            <div class="hint" id="repeatsPreview" style="margin-bottom:1rem; color:#555;"></div>
+
+            <div class="row">
+                <div>
+                    <label for="elevations">Number of elevations</label>
+                    <input type="number" id="elevations" min="1" value="3">
+                </div>
+                <div>
+                    <label for="delay">Sweep delay (seconds)</label>
+                    <div class="hint">After every sweep + once at start</div>
+                    <input type="number" id="delay" min="0" step="0.1" value="5">
+                </div>
+            </div>
+
+            <label class="checkbox-row">
+                <input type="checkbox" id="closedLoopEnabled" onchange="toggleClosedLoop()">
+                <span>Intermediate closed loop</span>
+                <span class="hint-inline">(closed-loop period between each velocity)</span>
+            </label>
+
+            <div class="closed-loop-fields" id="closedLoopFields">
+                <label for="closedLoopDuration">Closed-loop duration (seconds)</label>
+                <div class="hint">Duration of each closed-loop period inserted after each velocity</div>
+                <input type="number" id="closedLoopDuration" min="0" step="1" value="20">
+            </div>
+
+            <div id="errorMsg" class="error"></div>
+            <button onclick="calculate()">Calculate</button>
+        </div>
+
+        <div class="result card" id="resultCard">
+            <h2>Results</h2>
+            <div class="total-time" id="totalTime"></div>
+            <div id="totalSeconds" style="color:#666; font-size:0.9rem; margin-bottom:0.5rem;"></div>
+
+            <div class="breakdown">
+                <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Sweep breakdown per speed</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Speed (°/s)</th>
+                            <th>Repeats</th>
+                            <th class="num">Time/sweep</th>
+                            <th class="num">Total sweeps</th>
+                            <th class="num">Sweep time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="breakdownBody"></tbody>
+                </table>
+            </div>
+
+            <div class="breakdown" style="margin-top:1rem;">
+                <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Delay & overhead breakdown</h3>
+                <table>
+                    <tbody id="delayBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function getRepeatMode() {
+            return document.querySelector('input[name="repeatMode"]:checked').value;
+        }
+
+        function getRepeatsArray() {
+            const speeds = parseList(document.getElementById('speeds').value);
+            const mode = getRepeatMode();
+            const r1 = parseInt(document.getElementById('baseRepeat').value) || 1;
+
+            if (mode === 'equal') {
+                return speeds.map(() => r1);
+            } else if (mode === 'scaled') {
+                const minSpeed = Math.min(...speeds);
+                return speeds.map(s => Math.round(r1 * s / minSpeed));
+            } else {
+                return parseList(document.getElementById('repeats').value);
+            }
+        }
+
+        function updateRepeatMode() {
+            const mode = getRepeatMode();
+            document.getElementById('baseRepeatRow').classList.toggle('visible', mode !== 'specified');
+            document.getElementById('specifiedRepeatsRow').style.display = mode === 'specified' ? 'block' : 'none';
+            updateRepeatsPreview();
+            calculate();
+        }
+
+        function updateRepeatsPreview() {
+            const speeds = parseList(document.getElementById('speeds').value);
+            const repeats = getRepeatsArray();
+            const preview = document.getElementById('repeatsPreview');
+            if (speeds.length > 0 && repeats.length === speeds.length) {
+                preview.textContent = 'sweepRepeatVec = [' + repeats.join(', ') + ']';
+            } else {
+                preview.textContent = '';
+            }
+        }
+
+        function toggleClosedLoop() {
+            const fields = document.getElementById('closedLoopFields');
+            fields.classList.toggle('visible', document.getElementById('closedLoopEnabled').checked);
+            calculate();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('speeds').addEventListener('input', () => {
+                updateRepeatsPreview();
+                calculate();
+            });
+            document.getElementById('baseRepeat').addEventListener('input', () => {
+                updateRepeatsPreview();
+                calculate();
+            });
+            document.getElementById('repeats').addEventListener('input', () => {
+                updateRepeatsPreview();
+                calculate();
+            });
+            updateRepeatsPreview();
+        });
+
+        function parseList(str) {
+            return str.split(',').map(s => s.trim()).filter(s => s !== '').map(Number);
+        }
+
+        function formatTime(totalSeconds) {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = (totalSeconds % 60).toFixed(1);
+            let parts = [];
+            if (h > 0) parts.push(h + 'h');
+            if (m > 0) parts.push(m + 'm');
+            parts.push(s + 's');
+            return parts.join(' ');
+        }
+
+        function calculate() {
+            const errorEl = document.getElementById('errorMsg');
+            errorEl.style.display = 'none';
+
+            const speeds = parseList(document.getElementById('speeds').value);
+            const N = parseInt(document.getElementById('elevations').value);
+            const delay = parseFloat(document.getElementById('delay').value);
+            const closedLoopEnabled = document.getElementById('closedLoopEnabled').checked;
+            const closedLoopDuration = closedLoopEnabled
+                ? parseFloat(document.getElementById('closedLoopDuration').value) : 0;
+
+            // Validation
+            if (speeds.length === 0 || speeds.some(isNaN) || speeds.some(v => v <= 0)) {
+                errorEl.textContent = 'Speeds must be positive numbers.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const repeats = getRepeatsArray();
+
+            if (repeats.length === 0 || repeats.some(isNaN) || repeats.some(v => v <= 0)) {
+                errorEl.textContent = 'Repeats must be positive numbers.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            if (speeds.length !== repeats.length) {
+                errorEl.textContent = `Mismatch: ${speeds.length} speed(s) but ${repeats.length} repeat(s).`;
+                errorEl.style.display = 'block';
+                return;
+            }
+            if (isNaN(N) || N < 1) {
+                errorEl.textContent = 'Elevations must be at least 1.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            if (isNaN(delay) || delay < 0) {
+                errorEl.textContent = 'Delay must be non-negative.';
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            const numSpeeds = speeds.length;
+
+            // === Sweep time ===
+            // Per velocity i: sweeps = 2 * repeats[i] * N
+            //   (sweepRepeat CW+CCW pairs per elevation, across N elevations)
+            let totalSweepTime = 0;
+            let totalSweepCount = 0;
+            let breakdownHTML = '';
+
+            for (let i = 0; i < numSpeeds; i++) {
+                const timePerSweep = 360 / speeds[i];
+                const sweepsForVel = 2 * repeats[i] * N;
+                const sweepTime = sweepsForVel * timePerSweep;
+                totalSweepTime += sweepTime;
+                totalSweepCount += sweepsForVel;
+
+                breakdownHTML += `<tr>
+                    <td>${speeds[i]}</td>
+                    <td>${repeats[i]}</td>
+                    <td class="num">${timePerSweep.toFixed(1)}s</td>
+                    <td class="num">${sweepsForVel}</td>
+                    <td class="num">${sweepTime.toFixed(1)}s</td>
+                </tr>`;
+            }
+            breakdownHTML += `<tr class="summary-row">
+                <td colspan="3">Total sweep time</td>
+                <td class="num">${totalSweepCount}</td>
+                <td class="num">${totalSweepTime.toFixed(1)}s</td>
+            </tr>`;
+
+            // === Delay calculation ===
+            // Matches AnimateCylinderTexture.cs logic:
+            //
+            // 1) Initial starting delay (1x): waitTime starts at 0, first sweep
+            //    waits for Time.time >= sweepDelaySeconds (line 103).
+            //
+            // 2) Between-sweep delays: inSweepDelay fires after every single
+            //    sweep (line 128-133), totalling totalSweepCount delays.
+            //
+            // 3) Velocity transition delays: when a velocity finishes, the code
+            //    sets waitTime = Time.time (line 87), and the next velocity waits
+            //    sweepDelaySeconds again (line 103). This gives (numSpeeds - 1)
+            //    additional delays. (Last velocity has no successor.)
+
+            const initialDelays = 1;
+            const betweenSweepDelays = totalSweepCount;
+            const velTransitionDelays = Math.max(0, numSpeeds - 1);
+            const totalDelayCount = initialDelays + betweenSweepDelays + velTransitionDelays;
+            const totalDelayTime = totalDelayCount * delay;
+
+            // === Closed-loop periods ===
+            // WithClosedLoop.cs: after each velocity finishes, a closed-loop
+            // period of closedLoopDurationSeconds runs (line 126-143).
+            // All numSpeeds velocities get a closed-loop period (including the
+            // last, which runs indefinitely in code but we count one duration).
+            const closedLoopPeriods = closedLoopEnabled ? numSpeeds : 0;
+            const totalClosedLoopTime = closedLoopPeriods * closedLoopDuration;
+
+            const totalTime = totalSweepTime + totalDelayTime + totalClosedLoopTime;
+
+            // === Delay breakdown table ===
+            let delayHTML = `
+                <tr>
+                    <td>Initial starting delay</td>
+                    <td class="num">${initialDelays} &times; ${delay}s = ${(initialDelays * delay).toFixed(1)}s</td>
+                </tr>
+                <tr>
+                    <td>Between-sweep delays (after each of ${totalSweepCount} sweeps)</td>
+                    <td class="num">${betweenSweepDelays} &times; ${delay}s = ${(betweenSweepDelays * delay).toFixed(1)}s</td>
+                </tr>
+                <tr>
+                    <td>Velocity transition delays</td>
+                    <td class="num">${velTransitionDelays} &times; ${delay}s = ${(velTransitionDelays * delay).toFixed(1)}s</td>
+                </tr>`;
+
+            if (closedLoopEnabled) {
+                delayHTML += `
+                <tr>
+                    <td>Closed-loop periods (after each velocity)</td>
+                    <td class="num">${closedLoopPeriods} &times; ${closedLoopDuration}s = ${totalClosedLoopTime.toFixed(1)}s</td>
+                </tr>`;
+            }
+
+            delayHTML += `
+                <tr class="summary-row">
+                    <td>Total overhead</td>
+                    <td class="num">${(totalDelayTime + totalClosedLoopTime).toFixed(1)}s</td>
+                </tr>`;
+
+            document.getElementById('breakdownBody').innerHTML = breakdownHTML;
+            document.getElementById('delayBody').innerHTML = delayHTML;
+            document.getElementById('totalTime').textContent = formatTime(totalTime);
+            document.getElementById('totalSeconds').textContent =
+                `${totalTime.toFixed(1)} seconds total (${totalSweepTime.toFixed(1)}s sweeps + ${totalDelayTime.toFixed(1)}s delays` +
+                (closedLoopEnabled ? ` + ${totalClosedLoopTime.toFixed(1)}s closed-loop` : '') + ')';
+            document.getElementById('resultCard').classList.add('visible');
+        }
+
+        // Auto-calculate on load
+        calculate();
+    </script>
+</body>
+</html>

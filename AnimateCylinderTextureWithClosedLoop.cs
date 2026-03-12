@@ -10,7 +10,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
 
     public float numElevationSteps = 10.0f;
 
-    public float delaySeconds = 10;
+    public float sweepDelaySeconds = 0;
     public float offsetTex = -90.0f;
 
     public float offsetEl= 0.1f;
@@ -24,6 +24,9 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
     private float rotDir = 1.0f;
     private int vel = 0;
     private float waitTime = 0;
+    private float sweepWaitTime = 0;
+    private bool inSweepDelay = false;
+    private float totalSweepDelayTime = 0;
     private bool inClosedLoop = false;
     private float closedLoopStartTime = 0;
 
@@ -115,6 +118,9 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             vel+=1;
             currentStep = 1;
             elevation = offsetEl;
+            rotDir = 1.0f;
+            totalSweepDelayTime = 0;
+            inSweepDelay = false;
 
             // Enter closed-loop mode: freeze texture, relax rotation constraint
             inClosedLoop = true;
@@ -137,10 +143,21 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             return;
         }
 
-        if (cylinderMaterial & Time.time >= (waitTime+delaySeconds))
+        // Wait out sweep delay between individual sweeps
+        if (inSweepDelay)
+        {
+            if (Time.time >= sweepWaitTime + sweepDelaySeconds)
+            {
+                inSweepDelay = false;
+                totalSweepDelayTime += Time.time - sweepWaitTime;
+            }
+            return;
+        }
+
+        if (cylinderMaterial & Time.time >= (waitTime+sweepDelaySeconds))
         {
 
-            float dTime = Time.time - (waitTime+delaySeconds);
+            float dTime = Time.time - (waitTime+sweepDelaySeconds) - totalSweepDelayTime;
             float x = offsetTex/cylinderDeg + dTime * rotDir * (vRotDeg_per_sec[vel] / cylinderDeg) % 1;
 
             //check if a round has been completed
@@ -160,6 +177,14 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                     rotDir = -1.0f; // now change direction to -ve
                 }
                 currentStep += 1;
+
+                // Enter sweep delay before next sweep begins
+                if (sweepDelaySeconds > 0)
+                {
+                    inSweepDelay = true;
+                    sweepWaitTime = Time.time;
+                    return;
+                }
 
             }
 
