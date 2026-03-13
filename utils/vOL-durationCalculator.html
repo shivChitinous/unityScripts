@@ -51,10 +51,10 @@
         .result { display: none; }
         .result.visible { display: block; }
         .total-time {
-            font-size: 2rem;
-            font-weight: 700;
+            font-size: 1rem;
+            font-weight: 600;
             color: #4a90d9;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
         .breakdown { margin-top: 1rem; }
         .breakdown table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
@@ -135,7 +135,11 @@
                     <div class="hint">Extra time added to total</div>
                     <input type="number" id="buffer" min="0" step="1" value="5">
                 </div>
-                <div></div>
+                <div>
+                    <label for="volumeRate">Imaging volume rate (Hz)</label>
+                    <div class="hint">Leave 0 to skip imaging calc</div>
+                    <input type="number" id="volumeRate" min="0" step="0.01" value="0">
+                </div>
             </div>
 
             <label class="checkbox-row">
@@ -156,8 +160,8 @@
 
         <div class="result card" id="resultCard">
             <h2>Results</h2>
+            <div id="totalSeconds" style="color:#4a90d9; font-size:1.4rem; font-weight:700; margin-bottom:0.25rem;"></div>
             <div class="total-time" id="totalTime"></div>
-            <div id="totalSeconds" style="color:#666; font-size:0.9rem; margin-bottom:0.5rem;"></div>
 
             <div class="breakdown">
                 <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Sweep breakdown per speed</h3>
@@ -180,6 +184,11 @@
                 <table>
                     <tbody id="delayBody"></tbody>
                 </table>
+            </div>
+
+            <div class="breakdown" style="margin-top:1rem; display:none;" id="imagingSection">
+                <h3 style="font-size:0.95rem; margin-bottom:0.5rem;">Imaging volumes</h3>
+                <div id="imagingResult" style="line-height:1.5;"></div>
             </div>
         </div>
     </div>
@@ -395,12 +404,28 @@
                     <td class="num">${(totalDelayTime + totalClosedLoopTime + buffer).toFixed(1)}s</td>
                 </tr>`;
 
+            // === Imaging volumes ===
+            const volumeRate = parseFloat(document.getElementById('volumeRate').value) || 0;
+            const imagingSection = document.getElementById('imagingSection');
+            if (volumeRate > 0) {
+                const imagingDuration = totalTime - 1;
+                const numVolumes = Math.floor(imagingDuration * volumeRate);
+                const actualImagingTime = numVolumes / volumeRate;
+                imagingSection.style.display = 'block';
+                document.getElementById('imagingResult').innerHTML =
+                    `<div style="font-size:1.4rem; font-weight:700; color:#4a90d9; margin-bottom:0.25rem;">${numVolumes} volumes</div>` +
+                    `<div style="font-size:0.85rem; font-weight:400; color:#666;">` +
+                    `at ${volumeRate} Hz, imaging stops 1s before stimulus ends<br>` +
+                    `Actual imaging time: ${Math.round(actualImagingTime)}s</div>`;
+            } else {
+                imagingSection.style.display = 'none';
+            }
+
             document.getElementById('breakdownBody').innerHTML = breakdownHTML;
             document.getElementById('delayBody').innerHTML = delayHTML;
-            document.getElementById('totalTime').textContent = formatTime(totalTime);
             document.getElementById('totalSeconds').textContent =
-                `${totalTime.toFixed(1)} seconds total (${totalSweepTime.toFixed(1)}s sweeps + ${totalDelayTime.toFixed(1)}s delays` +
-                (closedLoopEnabled ? ` + ${totalClosedLoopTime.toFixed(1)}s closed-loop` : '') + ')';
+                `${Math.round(totalTime)} seconds`;
+            document.getElementById('totalTime').textContent = formatTime(totalTime);
             document.getElementById('resultCard').classList.add('visible');
         }
 
