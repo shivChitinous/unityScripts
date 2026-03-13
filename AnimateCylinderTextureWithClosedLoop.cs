@@ -27,7 +27,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
     private float sweepWaitTime = 0;
     private bool inSweepDelay = false;
     private float totalSweepDelayTime = 0;
-    private bool inClosedLoop = false;
+    private bool inClosedLoop = true; // Start in closed loop
     private float closedLoopStartTime = 0;
 
     public float cylinderDeg = 360.0f;
@@ -75,26 +75,29 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
 
         cylinderMaterial.SetTextureOffset("_MainTex", offset);
 
+        // Start in closed loop: relax rotation constraint
+        closedLoopStartTime = Time.time;
+        if (_rotationConstraint != null)
+        {
+            _rotationConstraint.constraintActive = false;
+            Debug.Log("Closed loop ON (start): constraintActive set to false");
+        }
+
         //log values
         _currentLogEntry.xpos = x;
         _currentLogEntry.ypos = y;
-        _currentLogEntry.isClosedLoop = false;
+        _currentLogEntry.isClosedLoop = true;
         Janelia.Logger.Log(_currentLogEntry);
     }
 
     void Update()
     {
-        // Handle closed-loop interleave period
+        // Handle closed-loop period
         if (inClosedLoop)
         {
-            // Last velocity's closed loop lasts until the game ends
-            if (vel >= vRotDeg_per_sec.Length)
-            {
-                return;
-            }
             if (Time.time >= closedLoopStartTime + closedLoopDurationSeconds)
             {
-                // Closed-loop period is over, re-apply rotation constraint and resume sweeps
+                // Closed-loop period is over, re-apply rotation constraint and start sweep
                 inClosedLoop = false;
                 if (_rotationConstraint != null)
                 {
@@ -106,7 +109,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             return;
         }
 
-        // All velocities done and not in closed loop (shouldn't reach here, but guard)
+        // All velocities done
         if (vel >= vRotDeg_per_sec.Length)
         {
             return;
