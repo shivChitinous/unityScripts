@@ -29,6 +29,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
     private float totalSweepDelayTime = 0;
     private bool inClosedLoop = true; // Start in closed loop
     private float closedLoopStartTime = 0;
+    private bool isVelocityTransitionCL = false; // Distinguishes velocity-transition CL from between-sweep CL
 
     public float cylinderDeg = 360.0f;
 
@@ -76,6 +77,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
         cylinderMaterial.SetTextureOffset("_MainTex", offset);
 
         // Start in closed loop: relax rotation constraint
+        isVelocityTransitionCL = true; // Initial CL uses velocity-transition path (sets waitTime on end)
         closedLoopStartTime = Time.time;
         if (_rotationConstraint != null)
         {
@@ -97,15 +99,24 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
         {
             if (Time.time >= closedLoopStartTime + closedLoopDurationSeconds)
             {
-                // Closed-loop period is over, re-apply rotation constraint and start sweep
                 inClosedLoop = false;
                 if (_rotationConstraint != null)
                 {
                     _rotationConstraint.constraintActive = true;
                     Debug.Log("Closed loop OFF: constraintActive set to true");
                 }
-                
-                waitTime = Time.time;
+
+                if (isVelocityTransitionCL)
+                {
+                    // Velocity transition CL: reset waitTime for new velocity
+                    waitTime = Time.time;
+                }
+                else
+                {
+                    // Between-sweep CL: absorb CL duration into totalSweepDelayTime
+                    // so dTime calculation skips over the CL period
+                    totalSweepDelayTime += Time.time - closedLoopStartTime;
+                }
             }
             return;
         }
@@ -126,13 +137,14 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             totalSweepDelayTime = 0;
             inSweepDelay = false;
 
-            // Enter closed-loop mode: freeze texture, relax rotation constraint
+            // Enter closed-loop mode (velocity transition): freeze texture, relax rotation constraint
             inClosedLoop = true;
+            isVelocityTransitionCL = true;
             closedLoopStartTime = Time.time;
             if (_rotationConstraint != null)
             {
                 _rotationConstraint.constraintActive = false;
-                Debug.Log("Closed loop ON: constraintActive set to false, vel=" + vel);
+                Debug.Log("Closed loop ON (vel transition): constraintActive set to false, vel=" + vel);
             }
 
             // Reset texture to original position
@@ -154,6 +166,16 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             {
                 inSweepDelay = false;
                 totalSweepDelayTime += Time.time - sweepWaitTime;
+
+                // Enter between-sweep closed-loop period
+                inClosedLoop = true;
+                isVelocityTransitionCL = false;
+                closedLoopStartTime = Time.time;
+                if (_rotationConstraint != null)
+                {
+                    _rotationConstraint.constraintActive = false;
+                    Debug.Log("Closed loop ON (between sweeps): constraintActive set to false");
+                }
             }
             return;
         }

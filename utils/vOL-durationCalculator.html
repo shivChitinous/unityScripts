@@ -78,8 +78,6 @@
         .base-repeat-row.visible { display: block; }
         .closed-loop-fields { display: none; margin-bottom: 1rem; }
         .closed-loop-fields.visible { display: block; }
-        .trial-order-row { display: none; margin-bottom: 0.5rem; padding-left: 1rem; }
-        .trial-order-row.visible { display: block; }
         .btn-row { display: flex; gap: 0.75rem; }
         .btn-row button { flex: 1; }
         .btn-start { background: #5cb85c; }
@@ -152,14 +150,6 @@
                 <label><input type="radio" name="repeatMode" value="specified" onchange="updateRepeatMode()"> Specified</label>
             </div>
 
-            <div class="trial-order-row" id="trialOrderRow">
-                <div class="hint" style="margin-bottom:0.35rem;">Trial order</div>
-                <div class="radio-group">
-                    <label><input type="radio" name="trialOrder" value="velocity-first" checked onchange="saveToStorage(); calculate()"> All repeats per velocity</label>
-                    <label><input type="radio" name="trialOrder" value="repeat-first" onchange="saveToStorage(); calculate()"> All velocities per repeat</label>
-                </div>
-                <div class="hint" id="trialOrderHint" style="margin-top:0.25rem;"></div>
-            </div>
 
             <div class="base-repeat-row visible" id="baseRepeatRow">
                 <label for="baseRepeat">Base repeat count (r1)</label>
@@ -202,12 +192,12 @@
             <label class="checkbox-row">
                 <input type="checkbox" id="closedLoopEnabled" onchange="toggleClosedLoop()">
                 <span>Intermediate closed loop</span>
-                <span class="hint-inline">(closed-loop period between each velocity)</span>
+                <span class="hint-inline">(closed-loop period between each sweep)</span>
             </label>
 
             <div class="closed-loop-fields" id="closedLoopFields">
                 <label for="closedLoopDuration">Closed-loop duration (seconds)</label>
-                <div class="hint">Duration of each closed-loop period inserted after each velocity</div>
+                <div class="hint">Duration of each closed-loop period inserted between sweeps</div>
                 <input type="number" id="closedLoopDuration" min="0" step="1" value="20">
             </div>
 
@@ -282,7 +272,6 @@
             { id: 'closedLoopEnabled', type: 'checked' },
             { id: 'closedLoopDuration', type: 'value' },
             { id: 'repeatMode', type: 'radio' },
-            { id: 'trialOrder', type: 'radio' }
         ];
 
         function saveToStorage() {
@@ -336,29 +325,13 @@
             }
         }
 
-        function getTrialOrder() {
-            return document.querySelector('input[name="trialOrder"]:checked').value;
-        }
-
         function updateRepeatMode() {
             const mode = getRepeatMode();
             document.getElementById('baseRepeatRow').classList.toggle('visible', mode !== 'specified');
             document.getElementById('specifiedRepeatsRow').style.display = mode === 'specified' ? 'block' : 'none';
-            document.getElementById('trialOrderRow').classList.toggle('visible', mode === 'equal');
-            updateTrialOrderHint();
             updateRepeatsPreview();
             saveToStorage();
             calculate();
-        }
-
-        function updateTrialOrderHint() {
-            const hint = document.getElementById('trialOrderHint');
-            const order = getTrialOrder();
-            if (order === 'velocity-first') {
-                hint.textContent = 'v0\u00D7R, v1\u00D7R, v2\u00D7R, \u2026';
-            } else {
-                hint.textContent = '(v0, v1, v2, \u2026)\u00D7round 1, (v0, v1, v2, \u2026)\u00D7round 2, \u2026';
-            }
         }
 
         function updateRepeatsPreview() {
@@ -396,37 +369,19 @@
 
         // === Timeline builder ===
         // Builds an ordered array of events matching AnimateCylinderTexture.cs logic
-        function buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer, trialOrder) {
+        function buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer) {
             const events = [];
             let t = 0;
+            const hasCL = closedLoopEnabled && closedLoopDuration > 0;
 
-            function addSweepPair(v, e, r) {
-                const sweepDuration = 360 / speeds[v];
-
-                // CCW sweep (rotDir = +1.0 in C#)
-                events.push({
-                    type: 'sweep', start: t, duration: sweepDuration,
-                    label: 'Sweep CCW',
-                    speed: speeds[v], velIdx: v, elevIdx: e, repIdx: r, dir: 'CCW'
-                });
-                t += sweepDuration;
-
-                if (delay > 0) {
-                    events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
-                    t += delay;
-                }
-
-                // CW sweep (rotDir = -1.0 in C#)
-                events.push({
-                    type: 'sweep', start: t, duration: sweepDuration,
-                    label: 'Sweep CW',
-                    speed: speeds[v], velIdx: v, elevIdx: e, repIdx: r, dir: 'CW'
-                });
-                t += sweepDuration;
-
-                if (delay > 0) {
-                    events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
-                    t += delay;
+            // Flatten all sweeps into an ordered list (velocity-first)
+            const allSweeps = [];
+            for (let v = 0; v < speeds.length; v++) {
+                for (let e = 0; e < N; e++) {
+                    for (let r = 0; r < repeats[v]; r++) {
+                        allSweeps.push({ v, e, r, dir: 'CCW' });
+                        allSweeps.push({ v, e, r, dir: 'CW' });
+                    }
                 }
             }
 
@@ -436,76 +391,60 @@
                 t += buffer;
             }
 
-            if (closedLoopEnabled && closedLoopDuration > 0) {
-                // Initial closed-loop period (C# starts with inClosedLoop = true)
+            // Initial closed-loop period (C# starts with inClosedLoop = true)
+            if (hasCL) {
                 events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop (Initial)' });
                 t += closedLoopDuration;
             }
 
-            // Initial delay (waitTime gate: waitTime=0 at start, or waitTime=Time.time after CL)
+            // Initial delay (waitTime gate)
             if (delay > 0) {
                 events.push({ type: 'initial-delay', start: t, duration: delay, label: 'Initial Delay' });
                 t += delay;
             }
 
-            if (trialOrder === 'repeat-first' && getRepeatMode() === 'equal') {
-                const R = repeats[0]; // all equal
-                for (let r = 0; r < R; r++) {
-                    for (let v = 0; v < speeds.length; v++) {
-                        for (let e = 0; e < N; e++) {
-                            addSweepPair(v, e, r);
-                        }
-                        // Closed-loop after each velocity, except after the very last one
-                        const isLast = (r === R - 1 && v === speeds.length - 1);
-                        if (closedLoopEnabled && closedLoopDuration > 0 && !isLast) {
-                            // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
-                            if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
-                                t -= events[events.length - 1].duration;
-                                events.pop();
-                            }
-                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', round: r, velIdx: v });
+            // Build sweep events with delays and CL between them
+            for (let i = 0; i < allSweeps.length; i++) {
+                const s = allSweeps[i];
+                const sweepDuration = 360 / speeds[s.v];
+
+                events.push({
+                    type: 'sweep', start: t, duration: sweepDuration,
+                    label: 'Sweep ' + s.dir,
+                    speed: speeds[s.v], velIdx: s.v, elevIdx: s.e, repIdx: s.r, dir: s.dir
+                });
+                t += sweepDuration;
+
+                // After each sweep except the last: add delay + CL (or just delay)
+                if (i < allSweeps.length - 1) {
+                    const isVelTransition = allSweeps[i + 1].v !== s.v;
+
+                    if (hasCL) {
+                        if (isVelTransition) {
+                            // Velocity transition: CL (inSweepDelay cancelled), then delay (waitTime gate)
+                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', velIdx: s.v });
                             t += closedLoopDuration;
-                            // Delay after CL (waitTime = Time.time in C#)
                             if (delay > 0) {
                                 events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
                                 t += delay;
                             }
+                        } else {
+                            // Within velocity: delay (inSweepDelay), then CL
+                            if (delay > 0) {
+                                events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
+                                t += delay;
+                            }
+                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop' });
+                            t += closedLoopDuration;
                         }
-                    }
-                }
-            } else {
-                // Velocity-first (default)
-                for (let v = 0; v < speeds.length; v++) {
-                    const sweepDuration = 360 / speeds[v];
-                    for (let e = 0; e < N; e++) {
-                        for (let r = 0; r < repeats[v]; r++) {
-                            addSweepPair(v, e, r);
-                        }
-                    }
-
-                    // Closed-loop after this velocity, except the last
-                    if (closedLoopEnabled && closedLoopDuration > 0 && v < speeds.length - 1) {
-                        // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
-                        if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
-                            t -= events[events.length - 1].duration;
-                            events.pop();
-                        }
-                        events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', velIdx: v });
-                        t += closedLoopDuration;
-                        // Delay after CL (waitTime = Time.time in C#)
+                    } else {
+                        // No CL: just delay between sweeps
                         if (delay > 0) {
-                            events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
+                            events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
                             t += delay;
                         }
                     }
                 }
-            }
-
-            // Remove the trailing sweep-delay after the last sweep
-            // (C#: last sweep's inSweepDelay is cancelled by velocity check)
-            if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
-                t -= events[events.length - 1].duration;
-                events.pop();
             }
 
             return { events, totalDuration: t };
@@ -541,8 +480,7 @@
 
             if (speeds.length === 0 || repeats.length !== speeds.length) return;
 
-            const trialOrder = getTrialOrder();
-            const { events, totalDuration } = buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer, trialOrder);
+            const { events, totalDuration } = buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer);
             monitorTimeline = events;
             monitorTotalDuration = totalDuration;
             monitorStartTime = performance.now();
@@ -703,21 +641,12 @@
             // + (totalSweepCount - numSpeeds) inSweepDelays (between sweeps within each velocity)
             // + (numSpeeds - 1) velocity-transition delays (waitTime gate replaces cancelled last-sweep inSweepDelay)
             // = totalSweepCount
-            // This holds for both CL and non-CL: CL periods insert extra time but
-            // the delay after each CL comes from the same waitTime gate.
-            const trialOrder = getTrialOrder();
-            const isRepeatFirst = trialOrder === 'repeat-first' && getRepeatMode() === 'equal';
             const totalDelayCount = totalSweepCount;
             const totalDelayTime = totalDelayCount * delay;
 
             // === Closed-loop periods ===
-            // 1 initial CL + 1 after each velocity except the very last.
-            // Velocity-first: 1 + (numSpeeds - 1) = numSpeeds
-            // Repeat-first: 1 + (R * numSpeeds - 1) = R * numSpeeds
-            const equalR = repeats[0] || 1;
-            const closedLoopPeriods = closedLoopEnabled
-                ? (isRepeatFirst ? equalR * numSpeeds : numSpeeds)
-                : 0;
+            // CL between every sweep: 1 initial + (totalSweepCount - 1) between sweeps = totalSweepCount
+            const closedLoopPeriods = closedLoopEnabled ? totalSweepCount : 0;
             const totalClosedLoopTime = closedLoopPeriods * closedLoopDuration;
 
             const buffer = parseFloat(document.getElementById('buffer').value) || 0;
@@ -733,7 +662,7 @@
             if (closedLoopEnabled) {
                 delayHTML += `
                 <tr>
-                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} between velocities)</td>
+                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} between sweeps)</td>
                     <td class="num">${closedLoopPeriods} &times; ${closedLoopDuration}s = ${totalClosedLoopTime.toFixed(1)}s</td>
                 </tr>`;
             }
