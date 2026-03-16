@@ -113,9 +113,16 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 }
                 else
                 {
-                    // Between-sweep CL: absorb CL duration into totalSweepDelayTime
+                    // Between-pair CL: absorb CL duration into totalSweepDelayTime
                     // so dTime calculation skips over the CL period
                     totalSweepDelayTime += Time.time - closedLoopStartTime;
+
+                    // Enter sweep delay before next sweep (CL → delay → next CCW)
+                    if (sweepDelaySeconds > 0)
+                    {
+                        inSweepDelay = true;
+                        sweepWaitTime = Time.time;
+                    }
                 }
             }
             return;
@@ -166,21 +173,6 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
             {
                 inSweepDelay = false;
                 totalSweepDelayTime += Time.time - sweepWaitTime;
-
-                // Enter CL after a completed back-and-forth pair (CCW + CW).
-                // After currentStep += 1: odd means we just finished CW (pair done),
-                // even means we just finished CCW (mid-pair, no CL).
-                if (currentStep % 2 == 1)
-                {
-                    inClosedLoop = true;
-                    isVelocityTransitionCL = false;
-                    closedLoopStartTime = Time.time;
-                    if (_rotationConstraint != null)
-                    {
-                        _rotationConstraint.constraintActive = false;
-                        Debug.Log("Closed loop ON (between pairs): constraintActive set to false");
-                    }
-                }
             }
             return;
         }
@@ -209,7 +201,26 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 }
                 currentStep += 1;
 
-                // Enter sweep delay before next sweep begins
+                // After a completed pair (CW done, currentStep now odd):
+                // enter CL immediately, unless it's the last pair of the velocity
+                // (which is handled by the velocity-transition check at the top of Update).
+                bool pairComplete = (currentStep % 2 == 1);
+                bool lastPairOfVel = (currentStep > repeats * 2 * sweepRepeatVec[vel] * numElevationSteps);
+
+                if (pairComplete && !lastPairOfVel)
+                {
+                    inClosedLoop = true;
+                    isVelocityTransitionCL = false;
+                    closedLoopStartTime = Time.time;
+                    if (_rotationConstraint != null)
+                    {
+                        _rotationConstraint.constraintActive = false;
+                        Debug.Log("Closed loop ON (between pairs): constraintActive set to false");
+                    }
+                    return;
+                }
+
+                // Mid-pair (CCW done) or last pair: normal sweep delay
                 if (sweepDelaySeconds > 0)
                 {
                     inSweepDelay = true;

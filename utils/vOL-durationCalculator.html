@@ -421,22 +421,13 @@
                     const isVelTransition = allSweeps[i + 1].v !== s.v;
 
                     if (hasCL && isPairEnd) {
-                        if (isVelTransition) {
-                            // Velocity transition after pair: CL (inSweepDelay cancelled), then delay
-                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', velIdx: s.v });
-                            t += closedLoopDuration;
-                            if (delay > 0) {
-                                events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
-                                t += delay;
-                            }
-                        } else {
-                            // Within velocity after pair: delay (inSweepDelay), then CL
-                            if (delay > 0) {
-                                events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
-                                t += delay;
-                            }
-                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop' });
-                            t += closedLoopDuration;
+                        // After a completed pair: CL first, then delay before next sweep
+                        events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration,
+                            label: 'Closed Loop', velIdx: isVelTransition ? s.v : undefined });
+                        t += closedLoopDuration;
+                        if (delay > 0) {
+                            events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
+                            t += delay;
                         }
                     } else {
                         // Mid-pair (CCW→CW) or no CL: just delay
