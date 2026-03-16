@@ -84,7 +84,10 @@ public class AnimateCylinderTexture : MonoBehaviour
             inSweepDelay = false;
             if (vel < vRotDeg_per_sec.Length)
             {
-                waitTime = Time.time;
+                // Offset by sweepDelaySeconds so line 103's check
+                // (Time.time >= waitTime + sweepDelaySeconds) passes immediately.
+                // The last sweep's inSweepDelay already served the delay.
+                waitTime = Time.time - sweepDelaySeconds;
             }
             return;
         }
