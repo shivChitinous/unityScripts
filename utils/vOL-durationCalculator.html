@@ -455,20 +455,21 @@
                         for (let e = 0; e < N; e++) {
                             addSweepPair(v, e, r);
                         }
-                    }
-                    // Closed-loop after each round, except the last
-                    if (closedLoopEnabled && closedLoopDuration > 0 && r < R - 1) {
-                        // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
-                        if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
-                            t -= events[events.length - 1].duration;
-                            events.pop();
-                        }
-                        events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', round: r });
-                        t += closedLoopDuration;
-                        // Delay after CL (waitTime = Time.time in C#)
-                        if (delay > 0) {
-                            events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
-                            t += delay;
+                        // Closed-loop after each velocity, except after the very last one
+                        const isLast = (r === R - 1 && v === speeds.length - 1);
+                        if (closedLoopEnabled && closedLoopDuration > 0 && !isLast) {
+                            // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
+                            if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
+                                t -= events[events.length - 1].duration;
+                                events.pop();
+                            }
+                            events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', round: r, velIdx: v });
+                            t += closedLoopDuration;
+                            // Delay after CL (waitTime = Time.time in C#)
+                            if (delay > 0) {
+                                events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
+                                t += delay;
+                            }
                         }
                     }
                 }
@@ -710,11 +711,12 @@
             const totalDelayTime = totalDelayCount * delay;
 
             // === Closed-loop periods ===
-            // Velocity-first: one CL after each velocity = numSpeeds
-            // Repeat-first: one CL after each round = repeats[0]
+            // 1 initial CL + 1 after each velocity except the very last.
+            // Velocity-first: 1 + (numSpeeds - 1) = numSpeeds
+            // Repeat-first: 1 + (R * numSpeeds - 1) = R * numSpeeds
             const equalR = repeats[0] || 1;
             const closedLoopPeriods = closedLoopEnabled
-                ? (isRepeatFirst ? equalR : numSpeeds)
+                ? (isRepeatFirst ? equalR * numSpeeds : numSpeeds)
                 : 0;
             const totalClosedLoopTime = closedLoopPeriods * closedLoopDuration;
 
@@ -731,7 +733,7 @@
             if (closedLoopEnabled) {
                 delayHTML += `
                 <tr>
-                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} ${isRepeatFirst ? 'between rounds' : 'between velocities'})</td>
+                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} between velocities)</td>
                     <td class="num">${closedLoopPeriods} &times; ${closedLoopDuration}s = ${totalClosedLoopTime.toFixed(1)}s</td>
                 </tr>`;
             }
