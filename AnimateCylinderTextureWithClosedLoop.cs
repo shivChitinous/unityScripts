@@ -167,14 +167,19 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 inSweepDelay = false;
                 totalSweepDelayTime += Time.time - sweepWaitTime;
 
-                // Enter between-sweep closed-loop period
-                inClosedLoop = true;
-                isVelocityTransitionCL = false;
-                closedLoopStartTime = Time.time;
-                if (_rotationConstraint != null)
+                // Enter CL after a completed back-and-forth pair (CCW + CW).
+                // After currentStep += 1: odd means we just finished CW (pair done),
+                // even means we just finished CCW (mid-pair, no CL).
+                if (currentStep % 2 == 1)
                 {
-                    _rotationConstraint.constraintActive = false;
-                    Debug.Log("Closed loop ON (between sweeps): constraintActive set to false");
+                    inClosedLoop = true;
+                    isVelocityTransitionCL = false;
+                    closedLoopStartTime = Time.time;
+                    if (_rotationConstraint != null)
+                    {
+                        _rotationConstraint.constraintActive = false;
+                        Debug.Log("Closed loop ON (between pairs): constraintActive set to false");
+                    }
                 }
             }
             return;

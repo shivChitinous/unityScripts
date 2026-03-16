@@ -192,12 +192,12 @@
             <label class="checkbox-row">
                 <input type="checkbox" id="closedLoopEnabled" onchange="toggleClosedLoop()">
                 <span>Intermediate closed loop</span>
-                <span class="hint-inline">(closed-loop period between each sweep)</span>
+                <span class="hint-inline">(closed-loop period between each back-and-forth pair)</span>
             </label>
 
             <div class="closed-loop-fields" id="closedLoopFields">
                 <label for="closedLoopDuration">Closed-loop duration (seconds)</label>
-                <div class="hint">Duration of each closed-loop period inserted between sweeps</div>
+                <div class="hint">Duration of each closed-loop period inserted between pairs</div>
                 <input type="number" id="closedLoopDuration" min="0" step="1" value="20">
             </div>
 
@@ -403,10 +403,11 @@
                 t += delay;
             }
 
-            // Build sweep events with delays and CL between them
+            // Build sweep events with delays and CL between pairs
             for (let i = 0; i < allSweeps.length; i++) {
                 const s = allSweeps[i];
                 const sweepDuration = 360 / speeds[s.v];
+                const isPairEnd = (i % 2 === 1); // CW sweep = end of back-and-forth pair
 
                 events.push({
                     type: 'sweep', start: t, duration: sweepDuration,
@@ -415,13 +416,13 @@
                 });
                 t += sweepDuration;
 
-                // After each sweep except the last: add delay + CL (or just delay)
+                // After each sweep except the last
                 if (i < allSweeps.length - 1) {
                     const isVelTransition = allSweeps[i + 1].v !== s.v;
 
-                    if (hasCL) {
+                    if (hasCL && isPairEnd) {
                         if (isVelTransition) {
-                            // Velocity transition: CL (inSweepDelay cancelled), then delay (waitTime gate)
+                            // Velocity transition after pair: CL (inSweepDelay cancelled), then delay
                             events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', velIdx: s.v });
                             t += closedLoopDuration;
                             if (delay > 0) {
@@ -429,7 +430,7 @@
                                 t += delay;
                             }
                         } else {
-                            // Within velocity: delay (inSweepDelay), then CL
+                            // Within velocity after pair: delay (inSweepDelay), then CL
                             if (delay > 0) {
                                 events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
                                 t += delay;
@@ -438,7 +439,7 @@
                             t += closedLoopDuration;
                         }
                     } else {
-                        // No CL: just delay between sweeps
+                        // Mid-pair (CCW→CW) or no CL: just delay
                         if (delay > 0) {
                             events.push({ type: 'sweep-delay', start: t, duration: delay, label: 'Sweep Delay' });
                             t += delay;
@@ -645,8 +646,10 @@
             const totalDelayTime = totalDelayCount * delay;
 
             // === Closed-loop periods ===
-            // CL between every sweep: 1 initial + (totalSweepCount - 1) between sweeps = totalSweepCount
-            const closedLoopPeriods = closedLoopEnabled ? totalSweepCount : 0;
+            // CL between every back-and-forth pair:
+            // 1 initial + (totalPairs - 1) between pairs = totalPairs
+            const totalPairs = totalSweepCount / 2;
+            const closedLoopPeriods = closedLoopEnabled ? totalPairs : 0;
             const totalClosedLoopTime = closedLoopPeriods * closedLoopDuration;
 
             const buffer = parseFloat(document.getElementById('buffer').value) || 0;
@@ -662,7 +665,7 @@
             if (closedLoopEnabled) {
                 delayHTML += `
                 <tr>
-                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} between sweeps)</td>
+                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} between pairs)</td>
                     <td class="num">${closedLoopPeriods} &times; ${closedLoopDuration}s = ${totalClosedLoopTime.toFixed(1)}s</td>
                 </tr>`;
             }
