@@ -104,9 +104,8 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                     _rotationConstraint.constraintActive = true;
                     Debug.Log("Closed loop OFF: constraintActive set to true");
                 }
-                // Offset so the sweepDelay check passes immediately.
-                // The last sweep before CL already served its inSweepDelay.
-                waitTime = Time.time - sweepDelaySeconds;
+                
+                waitTime = Time.time;
             }
             return;
         }

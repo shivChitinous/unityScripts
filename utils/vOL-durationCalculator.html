@@ -436,7 +436,13 @@
                 t += buffer;
             }
 
-            // Initial starting delay (sweepDelay before first sweep)
+            if (closedLoopEnabled && closedLoopDuration > 0) {
+                // Initial closed-loop period (C# starts with inClosedLoop = true)
+                events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop (Initial)' });
+                t += closedLoopDuration;
+            }
+
+            // Initial delay (waitTime gate: waitTime=0 at start, or waitTime=Time.time after CL)
             if (delay > 0) {
                 events.push({ type: 'initial-delay', start: t, duration: delay, label: 'Initial Delay' });
                 t += delay;
@@ -450,10 +456,20 @@
                             addSweepPair(v, e, r);
                         }
                     }
-                    // Closed-loop after each complete round
-                    if (closedLoopEnabled && closedLoopDuration > 0) {
+                    // Closed-loop after each round, except the last
+                    if (closedLoopEnabled && closedLoopDuration > 0 && r < R - 1) {
+                        // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
+                        if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
+                            t -= events[events.length - 1].duration;
+                            events.pop();
+                        }
                         events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', round: r });
                         t += closedLoopDuration;
+                        // Delay after CL (waitTime = Time.time in C#)
+                        if (delay > 0) {
+                            events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
+                            t += delay;
+                        }
                     }
                 }
             } else {
@@ -466,12 +482,29 @@
                         }
                     }
 
-                    // Closed-loop after this velocity
-                    if (closedLoopEnabled && closedLoopDuration > 0) {
+                    // Closed-loop after this velocity, except the last
+                    if (closedLoopEnabled && closedLoopDuration > 0 && v < speeds.length - 1) {
+                        // Remove trailing sweep-delay (C#: last sweep's inSweepDelay is cancelled)
+                        if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
+                            t -= events[events.length - 1].duration;
+                            events.pop();
+                        }
                         events.push({ type: 'closed-loop', start: t, duration: closedLoopDuration, label: 'Closed Loop', velIdx: v });
                         t += closedLoopDuration;
+                        // Delay after CL (waitTime = Time.time in C#)
+                        if (delay > 0) {
+                            events.push({ type: 'transition-delay', start: t, duration: delay, label: 'Transition Delay' });
+                            t += delay;
+                        }
                     }
                 }
+            }
+
+            // Remove the trailing sweep-delay after the last sweep
+            // (C#: last sweep's inSweepDelay is cancelled by velocity check)
+            if (events.length > 0 && events[events.length - 1].type === 'sweep-delay') {
+                t -= events[events.length - 1].duration;
+                events.pop();
             }
 
             return { events, totalDuration: t };
@@ -664,13 +697,16 @@
             </tr>`;
 
             // === Delay calculation ===
+            // Total delays = totalSweepCount:
+            //   1 initial delay (waitTime gate before first sweep)
+            // + (totalSweepCount - numSpeeds) inSweepDelays (between sweeps within each velocity)
+            // + (numSpeeds - 1) velocity-transition delays (waitTime gate replaces cancelled last-sweep inSweepDelay)
+            // = totalSweepCount
+            // This holds for both CL and non-CL: CL periods insert extra time but
+            // the delay after each CL comes from the same waitTime gate.
             const trialOrder = getTrialOrder();
             const isRepeatFirst = trialOrder === 'repeat-first' && getRepeatMode() === 'equal';
-            const initialDelays = 1;
-            const betweenSweepDelays = totalSweepCount;
-            // No separate velocity transition delays — C# code now offsets
-            // waitTime so the last sweep's inSweepDelay is the only gap.
-            const totalDelayCount = initialDelays + betweenSweepDelays;
+            const totalDelayCount = totalSweepCount;
             const totalDelayTime = totalDelayCount * delay;
 
             // === Closed-loop periods ===
@@ -688,18 +724,14 @@
             // === Delay breakdown table ===
             let delayHTML = `
                 <tr>
-                    <td>Initial starting delay</td>
-                    <td class="num">${initialDelays} &times; ${delay}s = ${(initialDelays * delay).toFixed(1)}s</td>
-                </tr>
-                <tr>
-                    <td>Between-sweep delays (after each of ${totalSweepCount} sweeps)</td>
-                    <td class="num">${betweenSweepDelays} &times; ${delay}s = ${(betweenSweepDelays * delay).toFixed(1)}s</td>
+                    <td>Sweep delays (1 initial + ${totalSweepCount - 1} between sweeps)</td>
+                    <td class="num">${totalDelayCount} &times; ${delay}s = ${totalDelayTime.toFixed(1)}s</td>
                 </tr>`;
 
             if (closedLoopEnabled) {
                 delayHTML += `
                 <tr>
-                    <td>Closed-loop periods (${isRepeatFirst ? 'after each round' : 'after each velocity'})</td>
+                    <td>Closed-loop periods (1 initial + ${closedLoopPeriods - 1} ${isRepeatFirst ? 'between rounds' : 'between velocities'})</td>
                     <td class="num">${closedLoopPeriods} &times; ${closedLoopDuration}s = ${totalClosedLoopTime.toFixed(1)}s</td>
                 </tr>`;
             }
