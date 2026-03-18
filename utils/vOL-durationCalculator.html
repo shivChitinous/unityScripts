@@ -199,6 +199,11 @@
                 <label for="closedLoopDuration">Closed-loop duration (seconds)</label>
                 <div class="hint">Duration of each closed-loop period inserted between pairs</div>
                 <input type="number" id="closedLoopDuration" min="0" step="1" value="20">
+                <label class="checkbox-row">
+                    <input type="checkbox" id="alternateDir">
+                    <span>Alternate start direction</span>
+                    <span class="hint-inline">(odd pairs start CW instead of CCW)</span>
+                </label>
             </div>
 
             <div id="errorMsg" class="error"></div>
@@ -271,6 +276,7 @@
             { id: 'volumeRate', type: 'value' },
             { id: 'closedLoopEnabled', type: 'checked' },
             { id: 'closedLoopDuration', type: 'value' },
+            { id: 'alternateDir', type: 'checked' },
             { id: 'repeatMode', type: 'radio' },
         ];
 
@@ -369,18 +375,21 @@
 
         // === Timeline builder ===
         // Builds an ordered array of events matching AnimateCylinderTexture.cs logic
-        function buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer) {
+        function buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer, alternateDir) {
             const events = [];
             let t = 0;
             const hasCL = closedLoopEnabled && closedLoopDuration > 0;
 
             // Flatten all sweeps into an ordered list (velocity-first)
             const allSweeps = [];
+            let pairIndex = 0;
             for (let v = 0; v < speeds.length; v++) {
                 for (let e = 0; e < N; e++) {
                     for (let r = 0; r < repeats[v]; r++) {
-                        allSweeps.push({ v, e, r, dir: 'CCW' });
-                        allSweeps.push({ v, e, r, dir: 'CW' });
+                        const flipPair = alternateDir && (pairIndex % 2 === 1);
+                        allSweeps.push({ v, e, r, dir: flipPair ? 'CW'  : 'CCW' });
+                        allSweeps.push({ v, e, r, dir: flipPair ? 'CCW' : 'CW'  });
+                        pairIndex++;
                     }
                 }
             }
@@ -472,7 +481,8 @@
 
             if (speeds.length === 0 || repeats.length !== speeds.length) return;
 
-            const { events, totalDuration } = buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer);
+            const alternateDir = document.getElementById('alternateDir').checked;
+            const { events, totalDuration } = buildTimeline(speeds, repeats, N, delay, closedLoopEnabled, closedLoopDuration, buffer, alternateDir);
             monitorTimeline = events;
             monitorTotalDuration = totalDuration;
             monitorStartTime = performance.now();
@@ -715,7 +725,6 @@
             });
 
             updateRepeatsPreview();
-            updateTrialOrderHint();
             calculate();
         });
     </script>

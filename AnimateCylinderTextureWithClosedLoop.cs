@@ -16,6 +16,7 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
     public float offsetEl= 0.1f;
 
     public int closedLoopDurationSeconds = 10;
+    public bool alternateStartDirection = false;
 
     private int repeats = 1; // use repeating velocities to ensure repeats
     private Material cylinderMaterial;
@@ -189,15 +190,19 @@ public class AnimateCylinderTextureWithClosedLoop : MonoBehaviour
                 if (currentStep % (2*sweepRepeatVec[vel]) == 0) // we finished the nth repeat, change elevation and reset direction
                 {
                     elevation += (1-offsetEl) / numElevationSteps;
-                    rotDir = 1.0f;
+                    // nextPairIdx = currentStep/2 (0-based index of the upcoming pair)
+                    rotDir = (alternateStartDirection && (currentStep / 2) % 2 == 1) ? -1.0f : 1.0f;
                 }
-                else if (currentStep % 2 == 0) // finished an even round --> second of two repeats
+                else if (currentStep % 2 == 0) // finished an even round --> second of two repeats (pair complete)
                 {
-                    rotDir = 1.0f; // now change direction to +ve
+                    // nextPairIdx = currentStep/2
+                    rotDir = (alternateStartDirection && (currentStep / 2) % 2 == 1) ? -1.0f : 1.0f;
                 }
-                else // finished an uneven round --> first of two repeats
+                else // finished an uneven round --> first of two repeats (mid-pair)
                 {
-                    rotDir = -1.0f; // now change direction to -ve
+                    // currentPairIdx = (currentStep-1)/2
+                    // On alternating odd pairs the first sweep is CW, so mid-pair → next is CCW
+                    rotDir = (alternateStartDirection && ((currentStep - 1) / 2) % 2 == 1) ? 1.0f : -1.0f;
                 }
                 currentStep += 1;
 
