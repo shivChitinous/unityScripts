@@ -142,6 +142,13 @@ public class talk2NiDaqMx : MonoBehaviour
 
     private void OnDestroy()
     {
+
+        // Send TTL low to stop ScanImage acquisition
+        int numWritten = 0;
+        double writeValue = 0.0; // or _outputParams.VoltageMin, depending on your TTL logic
+        Janelia.NiDaqMx.WriteToOutputs(_outputParams, writeValue, ref numWritten);
+
+        // Then clean up
         Janelia.NiDaqMx.OnDestroy();
     }
 
